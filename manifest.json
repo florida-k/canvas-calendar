@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Canvas Calendar Power Tool",
-  "version": "0.0.1",
-  "description": "Adds personal planning features to Canvas Calendar.",
-  "action": {
-    "default_popup": "popup.html"
-  },
-  "host_permissions": [
-    "https://ufl.instructure.com/*"
+  "version": "1.0",
+
+  "content_scripts": [
+    {
+      "matches": ["https://ufl.instructure.com/*"],
+      "js": ["content.js"]
+    }
   ]
 }
