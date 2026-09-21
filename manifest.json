@@ -3,6 +3,8 @@
   "name": "Canvas Calendar Power Tool",
   "version": "1.0",
 
+  "permissions": ["storage"],
+
   "content_scripts": [
     {
       "matches": ["https://ufl.instructure.com/*"],
