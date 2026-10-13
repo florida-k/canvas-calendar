@@ -2,13 +2,21 @@
   "manifest_version": 3,
   "name": "Canvas Calendar Power Tool",
   "version": "1.0",
-
-  "permissions": ["storage"],
-
+  "permissions": [
+    "storage"
+  ],
   "content_scripts": [
     {
-      "matches": ["https://ufl.instructure.com/*"],
-      "js": ["content.js"]
+      "matches": [
+        "https://ufl.instructure.com/*"
+      ],
+      "js": [
+        "content.js",
+        "mycal-sidebar.js"
+      ],
+      "css": [
+        "mycal-sidebar.css"
+      ]
     }
   ]
 }

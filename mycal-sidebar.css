@@ -1,0 +1,68 @@
+/* MyCal: non-destructive Canvas sidebar enhancement */
+#mycal-sidebar-panel {font-family:inherit;color:#263d34;margin:12px 0 18px;}
+#mycal-sidebar-panel .mycal-card {background:#fff;border:1px solid #e2e9e3;border-radius:12px;padding:14px;margin:0 0 11px;box-shadow:0 2px 9px rgba(20,55,39,.045)}
+#mycal-sidebar-panel .mycal-heading {display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;font-weight:700;font-size:14px}
+#mycal-sidebar-panel .mycal-muted {font-size:12px;color:#6d7b73;line-height:1.5}
+#mycal-sidebar-panel .mycal-brand {display:flex;align-items:center;gap:10px;margin-bottom:13px}
+#mycal-sidebar-panel .mycal-logo {width:35px;height:35px;border-radius:10px;background:#21664f;color:#fff;display:grid;place-items:center;font-size:20px}
+#mycal-sidebar-panel .mycal-brand-name {font-family:Georgia,serif;font-size:23px;color:#234c3b;line-height:1.1}
+#mycal-sidebar-panel .mycal-workload {background:#21664f;color:white;border-color:#21664f}
+#mycal-sidebar-panel .mycal-workload .mycal-muted {color:#d6e8dd}
+#mycal-sidebar-panel .mycal-number {font-family:Georgia,serif;font-size:30px;margin:6px 0}
+#mycal-sidebar-panel .mycal-row {display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;margin-top:8px}
+#mycal-sidebar-panel .mycal-focus-title {font-weight:700;font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+#mycal-sidebar-panel .mycal-action {border:0;border-radius:7px;background:#e6f1e9;color:#21664f;font-size:12px;font-weight:700;padding:9px 10px;cursor:pointer;width:100%;margin-top:10px;text-align:left}
+#mycal-sidebar-panel .mycal-action:hover {background:#d7e8dd}
+#mycal-sidebar-panel .mycal-priority {color:#a64135;font-weight:700;font-size:11px}
+#mycal-sidebar-panel .mycal-empty {font-size:12px;color:#6d7b73;line-height:1.5}
+#mycal-sidebar-panel .mycal-list {display:none;margin:10px 0 0;padding:0;list-style:none;max-height:230px;overflow:auto}
+#mycal-sidebar-panel .mycal-list.is-open {display:block}
+#mycal-sidebar-panel .mycal-list li {padding:8px 0;border-top:1px solid #edf0ed;font-size:12px;line-height:1.4}
+#mycal-sidebar-panel .mycal-pill {display:inline-block;padding:3px 7px;background:#e6f1e9;border-radius:6px;color:#21664f;font-size:11px}
+/* Improve existing native sidebar without changing its behavior */
+#right-side .mycal-native-calendars {background:#fff;border:1px solid #e2e9e3;border-radius:12px;padding:12px;margin:10px 0;box-shadow:0 2px 9px rgba(20,55,39,.045)}
+#right-side .mycal-native-calendars h2,#right-side .mycal-native-calendars h3 {color:#234c3b}
+
+
+/* MyCal progressive enhancement of Canvas's native calendar sidebar */
+#right-side .mycal-mini-toggle, #right-side .mycal-hidden-toggle {
+  display:block; width:100%; padding:10px 12px; border:1px solid #e2e9e3;
+  background:#fff; color:#21664f; border-radius:9px; font-size:12px;
+  font-weight:700; text-align:left; cursor:pointer; margin:8px 0;
+}
+#right-side .mycal-mini-toggle:hover, #right-side .mycal-hidden-toggle:hover {background:#edf5ef}
+#right-side .mycal-mini-collapsed {display:none !important}
+#right-side .mycal-hidden-calendars {margin-top:12px; border-top:1px solid #e2e9e3; padding-top:8px}
+#right-side .mycal-hidden-list {display:none; margin-top:8px}
+#right-side .mycal-hidden-calendars.is-open .mycal-hidden-list {display:block}
+
+/* Restore Canvas visibility toggles inside hidden calendars */
+
+.mycal-hidden-list .context-list-toggle-box {
+    display: inline-flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+
+    width: 12px !important;
+    height: 12px !important;
+    min-width: 12px !important;
+    min-height: 12px !important;
+
+    flex-shrink: 0 !important;
+    cursor: pointer !important;
+
+    border: 1px solid #aeb9b2 !important;
+    border-radius: 3px !important;
+    background-color: #f3f5f3 !important;
+}
+
+.mycal-hidden-list li {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px;
+}
+
+.mycal-hidden-list .context-list-toggle-box:hover {
+    border-color: #24654f !important;
+    background-color: #e6f1eb !important;
+}
