@@ -2,29 +2,6 @@ console.log("Canvas Calendar Power Tool loaded!");
 
 
 // --------------------------------------------------
-// TEMPORARY Power Tool metadata
-// Later this comes from Spring Boot / PostgreSQL.
-// --------------------------------------------------
-
-const powerToolData = {
-  "Homework 1 - Submission": {
-    priority: "high",
-    estimatedTime: "2h"
-  },
-
-  "Homework 2 - Inference for Linear Regression": {
-    priority: "medium",
-    estimatedTime: "1h"
-  },
-
-  "Homework 3 - Diagnostics and Remedial Measures": {
-    priority: "low",
-    estimatedTime: "45m"
-  }
-};
-
-
-// --------------------------------------------------
 // Chrome local storage
 // --------------------------------------------------
 
@@ -33,14 +10,68 @@ function getStorageKey(assignment) {
 }
 
 
+
 async function getSavedMetadata(assignment) {
   const key = getStorageKey(assignment);
 
-  const result =
-    await chrome.storage.local.get(key);
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "MYCAL_GET_METADATA",
+      courseId: String(assignment.course_id),
+      assignmentId: String(assignment.id)
+    });
 
-  return result[key] || null;
+    if (response?.ok && response.data) {
+      const backendData = response.data;
+
+      // Convert Spring Boot's format into the format
+      // your existing MyCal editor expects.
+      const metadata = {
+        priority: backendData.priority?.toLowerCase() || null,
+        estimatedTime: backendData.estimatedMinutes != null
+          ? formatEstimatedTime(backendData.estimatedMinutes)
+          : null,
+        notes: backendData.notes || ""
+      };
+
+      // Keep Chrome storage synchronized with PostgreSQL.
+      await chrome.storage.local.set({
+        [key]: metadata
+      });
+
+      return metadata;
+    }
+
+    if (response?.ok && response.data === null) {
+      // No database record yet. Preserve older local plans.
+      const local = await chrome.storage.local.get(key);
+      return local[key] || null;
+    }
+
+    console.warn("MyCal backend loading failed:", response?.error);
+
+  } catch (error) {
+    console.warn("MyCal backend unavailable:", error.message);
+  }
+
+  // Fallback if Spring Boot is offline.
+  const local = await chrome.storage.local.get(key);
+  return local[key] || null;
 }
+
+// Convert minutes from PostgreSQL to MyCal's display format.
+function formatEstimatedTime(minutes) {
+  const value = Number(minutes);
+
+  if (!Number.isFinite(value) || value < 0) return null;
+
+  if (value >= 60 && value % 60 === 0) {
+    return `${value / 60}h`;
+  }
+
+  return `${value}m`;
+}
+
 
 
 async function saveMetadata(assignment, metadata) {
@@ -166,820 +197,316 @@ function getCourseIdFromEvent(event) {
 // Power Tool assignment editor
 // --------------------------------------------------
 
-function openPowerToolEditor(
-  event,
-  assignment,
-  metadata
-) {
+function openPowerToolEditor(event, assignment, metadata = {}) {
+  document.querySelector(".power-tool-editor")?.remove();
 
-  // Remove an existing editor
-  document
-    .querySelector(
-      ".power-tool-editor"
-    )
-    ?.remove();
+  const editor = document.createElement("div");
+  editor.className = "power-tool-editor";
+  editor.setAttribute("role", "dialog");
+  editor.setAttribute("aria-modal", "true");
+  editor.setAttribute("aria-label", "MyCal assignment planner");
 
+  const dueDateText = assignment.due_at
+    ? new Date(assignment.due_at).toLocaleString([], {
+        month: "short", day: "numeric", hour: "numeric", minute: "2-digit"
+      })
+    : "No due date";
 
-  // --------------------------------------------------
-  // Format Canvas due date
-  // --------------------------------------------------
-
-  let dueDateText =
-    "No due date";
-
-
-  if (assignment.due_at) {
-
-    const dueDate =
-      new Date(
-        assignment.due_at
-      );
-
-
-    dueDateText =
-      dueDate.toLocaleString(
-        [],
-        {
-          month: "short",
-          day: "numeric",
-          hour: "numeric",
-          minute: "2-digit"
-        }
-      );
-  }
-
-
-  // --------------------------------------------------
-  // Parse existing estimated time
-  //
-  // "2h"  -> 2 + Hours
-  // "45m" -> 45 + Minutes
-  // --------------------------------------------------
-
-  let initialTimeValue = "";
-  let initialTimeUnit = "hours";
-
-
-  const timeMatch =
-    metadata.estimatedTime
-      ?.match(
-        /^([\d.]+)(h|m)$/
-      );
-
-
-  if (timeMatch) {
-
-    initialTimeValue =
-      timeMatch[1];
-
-
-    initialTimeUnit =
-      timeMatch[2] === "m"
-        ? "minutes"
-        : "hours";
-  }
-
-
-  // --------------------------------------------------
-  // Create editor
-  // --------------------------------------------------
-
-  const editor =
-    document.createElement(
-      "div"
-    );
-
-
-  editor.className =
-    "power-tool-editor";
-
+  const existingTime = metadata.estimatedTime || "";
+  const timeMatch = existingTime.match(/^([\d.]+)(h|m)$/);
+  const initialTimeValue = timeMatch ? timeMatch[1] : "";
+  const initialTimeUnit = timeMatch?.[2] === "m" ? "minutes" : "hours";
 
   editor.innerHTML = `
-    <div style="
-      position: fixed;
-      top: 120px;
-      right: 30px;
-      width: 330px;
-      background: white;
-      border: 1px solid #ddd;
-      border-radius: 12px;
-      padding: 20px;
-      z-index: 99999;
-      box-shadow: 0 6px 22px rgba(0,0,0,0.18);
-      font-family: Arial, sans-serif;
-    ">
-
-      <!-- HEADER -->
-
-      <div style="
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 14px;
-      ">
-
-        <div style="
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 1px;
-          color: #777;
-        ">
-          CANVAS POWER TOOL
+    <div class="mycal-editor-panel">
+      <header class="mycal-editor-header">
+        <div class="mycal-editor-brand">
+          <span class="mycal-editor-brand-icon" aria-hidden="true">✦</span>
+          <div><strong>MyCal</strong><span>Assignment planner</span></div>
         </div>
-
-        <button
-          id="powerToolClose"
-          type="button"
-          style="
-            border: none;
-            background: transparent;
-            font-size: 21px;
-            line-height: 1;
-            color: #777;
-            cursor: pointer;
-            padding: 2px 5px;
-          "
-        >
-          ×
-        </button>
-
+        <button id="powerToolClose" class="mycal-icon-button" type="button" aria-label="Close editor">×</button>
+      </header>
+      <section class="mycal-editor-assignment">
+        <h3 class="mycal-assignment-title"></h3>
+        <p class="mycal-course-name"></p>
+        <p class="mycal-due-date"></p>
+      </section>
+      <div class="mycal-editor-fields">
+        <div class="mycal-field">
+          <label class="mycal-field-label">Priority</label>
+          <div id="powerToolPriorityButtons" class="mycal-priority-group" role="group" aria-label="Priority">
+            <button type="button" data-priority="low"><span class="mycal-dot mycal-dot-low"></span>Low</button>
+            <button type="button" data-priority="medium"><span class="mycal-dot mycal-dot-medium"></span>Medium</button>
+            <button type="button" data-priority="high"><span class="mycal-dot mycal-dot-high"></span>High</button>
+          </div>
+        </div>
+        <div class="mycal-field">
+          <label class="mycal-field-label" for="powerToolTime">Estimated time</label>
+          <div class="mycal-time-row">
+            <input id="powerToolTime" type="number" min="0.01" step="any" placeholder="e.g. 2" />
+            <select id="powerToolTimeUnit" aria-label="Time unit">
+              <option value="minutes">Minutes</option>
+              <option value="hours">Hours</option>
+            </select>
+          </div>
+        </div>
+        <div class="mycal-field">
+          <label class="mycal-field-label" for="powerToolNotes">Notes <span class="mycal-optional">optional</span></label>
+          <textarea id="powerToolNotes" rows="3" placeholder="Add details, reminders, or a study plan..."></textarea>
+        </div>
       </div>
+      <p class="mycal-save-status" role="status" aria-live="polite"></p>
+      <footer class="mycal-editor-actions">
+        <button id="powerToolCancel" type="button">Cancel</button>
+        <button id="powerToolSave" type="button">Save changes</button>
+      </footer>
+    </div>`;
 
+  // Canvas assignment text is untrusted: assign textContent rather than HTML.
+  editor.querySelector(".mycal-assignment-title").textContent = assignment.name || "Assignment";
+  editor.querySelector(".mycal-course-name").textContent = assignment.course_name || "Canvas course";
+  editor.querySelector(".mycal-due-date").textContent = `Due ${dueDateText}`;
+  document.body.appendChild(editor);
 
-      <!-- CANVAS ASSIGNMENT INFORMATION -->
+  const timeInput = editor.querySelector("#powerToolTime");
+  const timeUnitInput = editor.querySelector("#powerToolTimeUnit");
+  const notesInput = editor.querySelector("#powerToolNotes");
+  const saveButton = editor.querySelector("#powerToolSave");
+  const status = editor.querySelector(".mycal-save-status");
+  const priorityButtons = [...editor.querySelectorAll("[data-priority]")];
+  let selectedPriority = metadata.priority || "medium";
 
-      <h3 style="
-        margin: 0 0 6px 0;
-        font-size: 18px;
-        line-height: 1.3;
-      ">
-        ${assignment.name}
-      </h3>
-
-      <div style="
-        font-size: 13px;
-        color: #666;
-        margin-bottom: 4px;
-      ">
-        ${assignment.course_name}
-      </div>
-
-      <div style="
-        font-size: 13px;
-        color: #777;
-        margin-bottom: 18px;
-      ">
-        Due ${dueDateText}
-      </div>
-
-
-      <hr style="
-        border: none;
-        border-top: 1px solid #eee;
-        margin: 0 0 18px 0;
-      ">
-
-
-      <!-- PRIORITY -->
-
-      <div style="
-        display: block;
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-        margin-bottom: 8px;
-      ">
-        PRIORITY
-      </div>
-
-
-      <div
-        id="powerToolPriorityButtons"
-        style="
-          display: flex;
-          gap: 8px;
-          margin-bottom: 20px;
-        "
-      >
-
-        <button
-          type="button"
-          data-priority="low"
-          style="
-            flex: 1;
-            padding: 8px 5px;
-            border-radius: 7px;
-            cursor: pointer;
-            background: white;
-          "
-        >
-          🟢 Low
-        </button>
-
-
-        <button
-          type="button"
-          data-priority="medium"
-          style="
-            flex: 1;
-            padding: 8px 5px;
-            border-radius: 7px;
-            cursor: pointer;
-            background: white;
-          "
-        >
-          🟡 Medium
-        </button>
-
-
-        <button
-          type="button"
-          data-priority="high"
-          style="
-            flex: 1;
-            padding: 8px 5px;
-            border-radius: 7px;
-            cursor: pointer;
-            background: white;
-          "
-        >
-          🔴 High
-        </button>
-
-      </div>
-
-
-      <!-- ESTIMATED TIME -->
-
-      <div style="
-        display: block;
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-        margin-bottom: 8px;
-      ">
-        ESTIMATED TIME
-      </div>
-
-
-      <div style="
-        display: flex;
-        gap: 8px;
-        margin-bottom: 20px;
-      ">
-
-        <input
-          id="powerToolTime"
-          type="number"
-          min="0"
-          step="0.5"
-          placeholder="2"
-          style="
-            width: 35%;
-            box-sizing: border-box;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-          "
-        />
-
-
-        <select
-          id="powerToolTimeUnit"
-          style="
-            flex: 1;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            background: white;
-          "
-        >
-
-          <option value="minutes">
-            Minutes
-          </option>
-
-          <option value="hours">
-            Hours
-          </option>
-
-        </select>
-
-      </div>
-
-
-      <!-- ACTIONS -->
-
-      <div style="
-        display: flex;
-        justify-content: flex-end;
-        gap: 8px;
-      ">
-
-        <button
-          id="powerToolCancel"
-          type="button"
-          style="
-            padding: 7px 13px;
-            cursor: pointer;
-          "
-        >
-          Cancel
-        </button>
-
-
-        <button
-          id="powerToolSave"
-          type="button"
-          style="
-            padding: 7px 15px;
-            cursor: pointer;
-            font-weight: 600;
-          "
-        >
-          Save
-        </button>
-
-      </div>
-
-    </div>
-  `;
-
-
-  document.body.appendChild(
-    editor
-  );
-
-
-  // --------------------------------------------------
-  // Current priority
-  // --------------------------------------------------
-
-  let selectedPriority =
-    metadata.priority ||
-    "medium";
-
-
-  // --------------------------------------------------
-  // Estimated time inputs
-  // --------------------------------------------------
-
-  const timeInput =
-    editor.querySelector(
-      "#powerToolTime"
-    );
-
-
-  const timeUnitInput =
-    editor.querySelector(
-      "#powerToolTimeUnit"
-    );
-
-
-  timeInput.value =
-    initialTimeValue;
-
-
-  timeUnitInput.value =
-    initialTimeUnit;
-
-
-  // --------------------------------------------------
-  // Priority buttons
-  // --------------------------------------------------
-
-  const priorityButtons =
-    editor.querySelectorAll(
-      "[data-priority]"
-    );
-
+  timeInput.value = initialTimeValue;
+  timeUnitInput.value = initialTimeUnit;
+  notesInput.value = metadata.notes || "";
 
   function updatePriorityButtons() {
-
-    priorityButtons.forEach(
-      (button) => {
-
-        const isSelected =
-          button.dataset.priority ===
-          selectedPriority;
-
-
-        if (isSelected) {
-
-          button.style.border =
-            "2px solid #444";
-
-          button.style.fontWeight =
-            "700";
-
-          button.style.background =
-            "#f5f5f5";
-
-        } else {
-
-          button.style.border =
-            "1px solid #ccc";
-
-          button.style.fontWeight =
-            "400";
-
-          button.style.background =
-            "white";
-        }
-
-      }
-    );
+    priorityButtons.forEach(button => {
+      const selected = button.dataset.priority === selectedPriority;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-pressed", String(selected));
+    });
   }
-
-
-  // Highlight saved priority
+  priorityButtons.forEach(button => button.addEventListener("click", () => {
+    selectedPriority = button.dataset.priority;
+    updatePriorityButtons();
+  }));
   updatePriorityButtons();
 
+  const closeEditor = () => editor.remove();
+  editor.querySelector("#powerToolClose").addEventListener("click", closeEditor);
+  editor.querySelector("#powerToolCancel").addEventListener("click", closeEditor);
 
-  // Change priority when clicked
-  priorityButtons.forEach(
-    (button) => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          selectedPriority =
-            button.dataset.priority;
-
-          updatePriorityButtons();
-        }
-      );
-
+  saveButton.addEventListener("click", async () => {
+    const timeValue = Number(timeInput.value);
+    if (!timeInput.value || !Number.isFinite(timeValue) || timeValue <= 0) {
+      status.textContent = "Enter an estimated time greater than zero.";
+      timeInput.focus();
+      return;
     }
-  );
 
+    const estimatedMinutes = Math.round(timeValue * (timeUnitInput.value === "hours" ? 60 : 1));
+    if (estimatedMinutes < 1) {
+      status.textContent = "Estimated time must be at least one minute.";
+      timeInput.focus();
+      return;
+    }
 
-  // --------------------------------------------------
-  // Close
-  // --------------------------------------------------
+    const newTime = formatEstimatedTime(estimatedMinutes);
+    const newMetadata = {
+      priority: selectedPriority,
+      estimatedTime: newTime,
+      notes: notesInput.value
+    };
 
-  editor
-    .querySelector(
-      "#powerToolClose"
-    )
-    .addEventListener(
-      "click",
-      () => {
-
-        editor.remove();
-
-      }
-    );
-
-
-  // --------------------------------------------------
-  // Cancel
-  // --------------------------------------------------
-
-  editor
-    .querySelector(
-      "#powerToolCancel"
-    )
-    .addEventListener(
-      "click",
-      () => {
-
-        editor.remove();
-
-      }
-    );
-
-
-  // --------------------------------------------------
-  // Save
-  // --------------------------------------------------
-
-  editor
-    .querySelector(
-      "#powerToolSave"
-    )
-    .addEventListener(
-      "click",
-      async () => {
-
-        const newPriority =
-          selectedPriority;
-
-
-        const timeValue =
-          timeInput.value;
-
-
-        const timeUnit =
-          timeUnitInput.value;
-
-
-        // Don't save an empty estimated time
-        if (!timeValue) {
-
-          alert(
-            "Please enter an estimated time."
-          );
-
-          return;
-        }
-
-
-        // Convert UI value back into our
-        // existing compact storage format.
-        //
-        // 2 + Hours   -> "2h"
-        // 45 + Minutes -> "45m"
-
-        const newTime =
-          timeUnit === "minutes"
-            ? `${timeValue}m`
-            : `${timeValue}h`;
-
-
-        // Persist metadata
-        await saveMetadata(
-          assignment,
-          {
-            priority:
-              newPriority,
-
-            estimatedTime:
-              newTime
+    saveButton.disabled = true;
+    status.textContent = "Saving...";
+    try {
+      // Preserve the existing local fallback while syncing to Spring Boot.
+      await saveMetadata(assignment, newMetadata);
+      try {
+        const result = await chrome.runtime.sendMessage({
+          type: "MYCAL_SAVE_METADATA",
+          courseId: String(assignment.course_id),
+          assignmentId: String(assignment.id),
+          metadata: {
+            priority: selectedPriority.toUpperCase(),
+            estimatedMinutes,
+            notes: newMetadata.notes || null
           }
-        );
-
-
-        // Update current metadata object
-        metadata.priority =
-          newPriority;
-
-        metadata.estimatedTime =
-          newTime;
-
-
-        // --------------------------------------------------
-        // Update calendar badge immediately
-        // --------------------------------------------------
-
-        const badge =
-          event.querySelector(
-            ".power-tool-badge"
-          );
-
-
-        const priorityIcons = {
-          high: "🔴",
-          medium: "🟡",
-          low: "🟢"
-        };
-
-
-        if (badge) {
-
-          badge.textContent =
-            `${priorityIcons[newPriority]} ` +
-            `${newPriority.toUpperCase()} · ` +
-            `⏱ ${newTime}`;
-
-        }
-
-
-        editor.remove();
+        });
+        if (!result?.ok) console.warn("MyCal backend unavailable; saved locally:", result?.error);
+      } catch (error) {
+        console.warn("MyCal backend unavailable; saved locally:", error);
       }
-    );
+
+      // Mutate the same object captured by the calendar badge/editor handlers.
+      Object.assign(metadata, newMetadata);
+      if (typeof event.mycalUpdatePlan === "function") event.mycalUpdatePlan();
+      closeEditor();
+    } catch (error) {
+      console.error("MyCal save failed:", error);
+      status.textContent = "Could not save. Please try again.";
+      saveButton.disabled = false;
+    }
+  });
 }
 
 
-// --------------------------------------------------
-// Enhance Canvas Calendar
-// --------------------------------------------------
-
-async function enhanceCalendar() {
-
-  try {
-
-    const assignments =
-      await loadCanvasAssignments();
+// Canvas event matching: prefer an actual assignment ID from the event/link.
+// A title is NOT a unique identifier. If no ID exists, only use a title when
+// it identifies exactly one API assignment within the course.
+function decodeCanvasText(value) {
+  const element = document.createElement("textarea");
+  element.innerHTML = value || "";
+  return element.value.replace(/\s+/g, " ").trim();
+}
 
 
-    console.log(
-      `Loaded ${assignments.length} real Canvas assignments`
-    );
+function getAssignmentIdFromEvent(event) {
+  const nodes = [
+    event,
+    ...event.querySelectorAll("*")
+  ];
 
+  for (const node of nodes) {
+    // Check Canvas data attributes
+    for (const attr of [
+      "data-assignment-id",
+      "data-assignment_id",
+      "data-assignmentid"
+    ]) {
+      const value = node.getAttribute(attr);
 
-    const events =
-      document.querySelectorAll(
-        ".fc-day-grid-event.assignment"
+      if (value && /^\d+$/.test(value)) {
+        return value;
+      }
+    }
+
+    // Check links to actual Canvas assignments
+    for (const attr of ["href", "data-url"]) {
+      const value = node.getAttribute(attr) || "";
+
+      const match = value.match(
+        /\/assignments\/(\d+)(?:[/?#]|$)/
       );
 
-
-    console.log(
-      `Found ${events.length} assignment events in calendar`
-    );
-
-
-    events.forEach(
-      async (event) => {
-
-        const title =
-          event.getAttribute(
-            "title"
-          );
-
-
-        const courseId =
-          getCourseIdFromEvent(
-            event
-          );
-
-
-        console.log(
-          "Calendar event:",
-          title,
-          "Course:",
-          courseId
-        );
-
-
-        // --------------------------------------------------
-        // Match DOM event with real Canvas API assignment
-        // --------------------------------------------------
-
-        const canvasAssignment =
-          assignments.find(
-            (assignment) =>
-              String(
-                assignment.course_id
-              ) ===
-                String(courseId) &&
-              assignment.name ===
-                title
-          );
-
-
-        if (!canvasAssignment) {
-
-          console.log(
-            "No API match:",
-            title
-          );
-
-          return;
-        }
-
-
-        console.log(
-          "MATCHED:",
-          canvasAssignment.id,
-          canvasAssignment.name
-        );
-
-
-        // --------------------------------------------------
-        // Load saved metadata
-        // --------------------------------------------------
-
-        let metadata =
-          await getSavedMetadata(
-            canvasAssignment
-          );
-
-
-        // If user has never saved anything,
-        // use temporary mock data.
-        if (!metadata) {
-
-          metadata =
-            powerToolData[
-              canvasAssignment.name
-            ];
-
-        }
-
-
-        if (!metadata) {
-          return;
-        }
-
-
-        // --------------------------------------------------
-        // Don't add duplicate indicators
-        // --------------------------------------------------
-
-        if (
-          event.querySelector(
-            ".power-tool-badge"
-          )
-        ) {
-
-          return;
-        }
-
-
-        const content =
-          event.querySelector(
-            ".fc-content"
-          );
-
-
-        if (!content) {
-          return;
-        }
-
-
-        const priorityIcons = {
-          high: "🔴",
-          medium: "🟡",
-          low: "🟢"
-        };
-
-
-        // --------------------------------------------------
-        // Create Power Tool calendar badge
-        // --------------------------------------------------
-
-        const badge =
-          document.createElement(
-            "div"
-          );
-
-
-        badge.className =
-          "power-tool-badge";
-
-
-        badge.textContent =
-          `${priorityIcons[metadata.priority]} ` +
-          `${metadata.priority.toUpperCase()} · ` +
-          `⏱ ${metadata.estimatedTime}`;
-
-
-        badge.style.fontSize =
-          "10px";
-
-        badge.style.fontWeight =
-          "600";
-
-        badge.style.padding =
-          "1px 3px";
-
-        badge.style.whiteSpace =
-          "nowrap";
-
-        badge.style.cursor =
-          "pointer";
-
-
-        // --------------------------------------------------
-        // Open editor when badge clicked
-        // --------------------------------------------------
-
-        badge.addEventListener(
-          "click",
-          (clickEvent) => {
-
-            // Prevent Canvas itself
-            // from handling this click
-            clickEvent.preventDefault();
-
-            clickEvent.stopPropagation();
-
-
-            openPowerToolEditor(
-              event,
-              canvasAssignment,
-              metadata
-            );
-
-          }
-        );
-
-
-        content.appendChild(
-          badge
-        );
-
+      if (match) {
+        return match[1];
       }
-    );
+    }
+  }
 
+  return null;
+}
+
+
+function matchCanvasAssignment(event, assignments) {
+  const courseId = getCourseIdFromEvent(event);
+  if (!courseId) return null;
+  const inCourse = assignments.filter(a => String(a.course_id) === String(courseId));
+  const assignmentId = getAssignmentIdFromEvent(event);
+  if (assignmentId) {
+    return inCourse.find(a => String(a.id) === assignmentId) || null;
+  }
+  // Compatibility fallback for Canvas event DOMs without exposed assignment IDs.
+  const title = decodeCanvasText(event.getAttribute("title") || event.querySelector(".fc-title")?.textContent);
+  const candidates = inCourse.filter(a => decodeCanvasText(a.name) === title);
+  if (candidates.length === 1) return candidates[0];
+  if (candidates.length > 1) console.warn("MyCal: ambiguous assignment title; skipping", title);
+  return null;
+}
+
+let cachedAssignments = null;
+let calendarEnhancementRunning = false;
+let calendarRefreshTimer = null;
+
+async function enhanceCalendar() {
+  if (calendarEnhancementRunning) return;
+  calendarEnhancementRunning = true;
+  try {
+    if (!cachedAssignments) cachedAssignments = await loadCanvasAssignments();
+    const events = document.querySelectorAll(".fc-day-grid-event.assignment");
+    for (const event of events) {
+      if (event.dataset.mycalEnhanced === "true") continue;
+      const assignment = matchCanvasAssignment(event, cachedAssignments);
+      if (!assignment) continue;
+      const content = event.querySelector(".fc-content");
+      if (!content) continue;
+      event.dataset.mycalEnhanced = "true";
+      const metadata = (await getSavedMetadata(assignment)) || {};
+      if (!event.isConnected) continue;
+
+      // A small edit control exists for EVERY matched assignment, not just saved ones.
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "mycal-event-edit";
+      // Compact icon button with a larger click target.
+      edit.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L9 17l-4 1 1-4Z"/></svg>`;
+      edit.title = "Customize in MyCal";
+      edit.setAttribute("aria-label", `Customize ${assignment.name} in MyCal`);
+      edit.addEventListener("click", e => {
+        e.preventDefault();
+        e.stopPropagation();
+        openPowerToolEditor(event, assignment, metadata);
+      });
+      content.appendChild(edit);
+
+      // Priority dot appears BEFORE the title, not after it.
+      const titleNode = content.querySelector(".fc-title");
+      const priorityDot = document.createElement("span");
+      priorityDot.className = "mycal-priority-dot";
+      priorityDot.setAttribute("aria-hidden", "true");
+      if (titleNode) titleNode.prepend(priorityDot);
+      else content.prepend(priorityDot);
+
+      // Keep effort and a text priority label visible beneath the title.
+      const badge = document.createElement("button");
+      badge.type = "button";
+      badge.className = "power-tool-badge";
+      function updateEventPlan() {
+        const priority = String(metadata.priority || "").toLowerCase();
+        const hasPlan = Boolean(priority || metadata.estimatedTime);
+        priorityDot.dataset.priority = priority;
+        priorityDot.hidden = !priority;
+        badge.hidden = !hasPlan;
+        badge.textContent = [priority ? priority.toUpperCase() : null,
+          metadata.estimatedTime ? `⏱ ${metadata.estimatedTime}` : null]
+          .filter(Boolean).join(" · ");
+      }
+      updateEventPlan();
+      // Let the editor's save handler update this event without rebuilding it.
+      event.mycalUpdatePlan = updateEventPlan;
+      badge.addEventListener("click", e => {
+        e.preventDefault();
+        e.stopPropagation();
+        openPowerToolEditor(event, assignment, metadata);
+      });
+      content.appendChild(badge);
+    }
   } catch (error) {
-
-    console.error(
-      "Canvas Power Tool error:",
-      error
-    );
-
+    console.error("MyCal calendar enhancement failed:", error);
+    // Retry API loading on the next calendar update.
+    cachedAssignments = null;
+  } finally {
+    calendarEnhancementRunning = false;
   }
 }
 
+function scheduleCalendarEnhancement() {
+  clearTimeout(calendarRefreshTimer);
+  calendarRefreshTimer = setTimeout(enhanceCalendar, 180);
+}
 
-// --------------------------------------------------
-// Give Canvas time to render its calendar
-// --------------------------------------------------
-
-setTimeout(
-  enhanceCalendar,
-  2000
-);
+// Canvas dynamically replaces events when navigating months/weeks.
+// Watch only calendar changes; avoid reacting to MyCal's own controls.
+const calendarObserver = new MutationObserver(mutations => {
+  const changedCalendarEvents = mutations.some(m =>
+    [...m.addedNodes].some(node => node.nodeType === 1 &&
+      (node.matches?.(".fc-day-grid-event.assignment, .fc-day-grid, .fc-view") ||
+       node.querySelector?.(".fc-day-grid-event.assignment")))
+  );
+  if (changedCalendarEvents) scheduleCalendarEnhancement();
+});
+calendarObserver.observe(document.documentElement, { childList: true, subtree: true });
+setTimeout(enhanceCalendar, 2000);

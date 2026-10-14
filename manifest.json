@@ -15,8 +15,15 @@
         "mycal-sidebar.js"
       ],
       "css": [
-        "mycal-sidebar.css"
+        "mycal-sidebar.css",
+        "mycal-editor.css"
       ]
     }
-  ]
+  ],
+  "host_permissions": [
+    "http://localhost:8080/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
 }

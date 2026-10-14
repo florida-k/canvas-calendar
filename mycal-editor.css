@@ -1,0 +1,80 @@
+/* MyCal event controls — lightweight and accessible */
+.fc-day-grid-event.assignment .fc-content { position: relative; }
+.fc-day-grid-event.assignment .mycal-event-edit {
+  position: absolute; right: 2px; top: 1px; z-index: 4;
+  border: 0; border-radius: 4px; background: rgba(255,255,255,.95);
+  color: #205c48; padding: 0 4px; font-size: 14px; line-height: 19px;
+  cursor: pointer; opacity: 0; transition: opacity .12s ease;
+}
+.fc-day-grid-event.assignment:hover .mycal-event-edit,
+.fc-day-grid-event.assignment:focus-within .mycal-event-edit,
+.fc-day-grid-event.assignment .mycal-event-edit:focus-visible { opacity: 1; }
+.fc-day-grid-event.assignment .power-tool-badge {
+  display: block; border: 0; border-radius: 4px; background: rgba(255,255,255,.9);
+  color: #24483c; font: 600 10px/1.4 Arial,sans-serif;
+  margin-top: 2px; padding: 1px 3px; cursor: pointer; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.fc-day-grid-event.assignment .power-tool-badge[hidden] { display: none !important; }
+@media (hover: none) { .fc-day-grid-event.assignment .mycal-event-edit { opacity: 1; } }
+
+/* MyCal assignment editor */
+.power-tool-editor { position: fixed; inset: 0; z-index: 2147483640; pointer-events: none; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; color: #243b30; }
+.power-tool-editor *, .power-tool-editor *::before, .power-tool-editor *::after { box-sizing: border-box; }
+.power-tool-editor .mycal-editor-panel { pointer-events: auto; position: absolute; right: 28px; top: 96px; width: min(370px, calc(100vw - 24px)); max-height: calc(100vh - 112px); overflow-y: auto; background: #fff; border: 1px solid #dce8df; border-radius: 16px; box-shadow: 0 14px 45px rgba(25,55,40,.18); }
+.power-tool-editor .mycal-editor-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 16px; border-bottom: 1px solid #edf2ee; }
+.power-tool-editor .mycal-editor-brand { display: flex; align-items: center; gap: 10px; }
+.power-tool-editor .mycal-editor-brand-icon { display: grid; place-items: center; width: 36px; height: 36px; background: #e7f3eb; color: #236349; border-radius: 10px; font-size: 20px; }
+.power-tool-editor .mycal-editor-brand strong { display: block; font-size: 15px; color: #225b43; }
+.power-tool-editor .mycal-editor-brand span:not(.mycal-editor-brand-icon) { display: block; font-size: 11px; color: #798b80; margin-top: 2px; }
+.power-tool-editor .mycal-icon-button { background: transparent; border: none; color: #7b8b80; font-size: 24px; line-height: 1; cursor: pointer; padding: 3px 7px; }
+.power-tool-editor .mycal-editor-assignment { padding: 19px 20px 17px; border-bottom: 1px solid #edf2ee; }
+.power-tool-editor .mycal-assignment-title { margin: 0 0 7px; font-size: 18px; line-height: 1.35; color: #243a30; font-weight: 700; overflow-wrap: anywhere; }
+.power-tool-editor .mycal-course-name, .power-tool-editor .mycal-due-date { margin: 0 0 5px; font-size: 12px; line-height: 1.5; color: #6a7b70; }
+.power-tool-editor .mycal-due-date { margin-bottom: 0; }
+.power-tool-editor .mycal-editor-fields { display: grid; gap: 18px; padding: 20px; }
+.power-tool-editor .mycal-field-label { display: block; margin-bottom: 9px; font-size: 12px; font-weight: 700; color: #375243; }
+.power-tool-editor .mycal-optional { color: #91a096; font-weight: 400; }
+.power-tool-editor .mycal-priority-group { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.power-tool-editor .mycal-priority-group button { display: flex; justify-content: center; align-items: center; gap: 6px; padding: 10px 4px; border: 1px solid #dce5de; border-radius: 8px; background: #fff; color: #425749; font-size: 12px; font-weight: 600; cursor: pointer; }
+.power-tool-editor .mycal-priority-group button.is-selected { border-color: #4e9671; background: #eaf5ee; color: #205a40; box-shadow: inset 0 0 0 1px #4e9671; }
+.power-tool-editor .mycal-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; }
+.power-tool-editor .mycal-dot-low { background: #4ba66c; }
+.power-tool-editor .mycal-dot-medium { background: #e7ad3f; }
+.power-tool-editor .mycal-dot-high { background: #e76d61; }
+.power-tool-editor .mycal-time-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.power-tool-editor input, .power-tool-editor select, .power-tool-editor textarea { width: 100%; min-width: 0; border: 1px solid #d9e4dc; border-radius: 8px; background: #fff; padding: 10px 11px; color: #263d30; font: inherit; font-size: 13px; outline: none; }
+.power-tool-editor textarea { resize: vertical; min-height: 78px; line-height: 1.5; }
+.power-tool-editor input:focus, .power-tool-editor select:focus, .power-tool-editor textarea:focus { border-color: #448d65; box-shadow: 0 0 0 3px #e6f3e9; }
+.power-tool-editor .mycal-save-status { min-height: 0; margin: 0; padding: 0 20px; font-size: 12px; color: #a34e38; }
+.power-tool-editor .mycal-save-status:empty { display: none; }
+.power-tool-editor .mycal-editor-actions { display: flex; justify-content: flex-end; gap: 9px; padding: 16px 20px 20px; border-top: 1px solid #edf2ee; }
+.power-tool-editor .mycal-editor-actions button { padding: 10px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.power-tool-editor #powerToolCancel { border: 1px solid #dce5de; background: #fff; color: #536a59; }
+.power-tool-editor #powerToolSave { border: 1px solid #236349; background: #236349; color: #fff; }
+.power-tool-editor #powerToolSave:disabled { opacity: .6; cursor: wait; }
+@media (max-width: 600px) { .power-tool-editor .mycal-editor-panel { top: 65px; right: 12px; max-height: calc(100vh - 80px); } }
+
+/* More discoverable edit button without hiding assignment titles */
+.fc-day-grid-event.assignment .fc-content { padding-right: 27px; }
+.fc-day-grid-event.assignment .mycal-event-edit {
+  top: 1px; right: 2px; width: 23px; height: 23px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #edf7f0; border: 1px solid #b9d7c4; border-radius: 7px;
+  color: #1d6244; opacity: .9; box-shadow: 0 1px 3px rgba(0,0,0,.1);
+  transition: opacity .12s ease, background .12s ease, transform .12s ease;
+}
+.fc-day-grid-event.assignment:hover .mycal-event-edit,
+.fc-day-grid-event.assignment:focus-within .mycal-event-edit { opacity: 1; background: #d6ebdd; }
+.fc-day-grid-event.assignment .mycal-event-edit:hover { transform: scale(1.06); }
+.fc-day-grid-event.assignment .mycal-event-edit:focus-visible { outline: 2px solid #1d6244; outline-offset: 1px; }
+/* Priority marker lives at the beginning of the assignment title */
+.fc-day-grid-event.assignment .mycal-priority-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  margin-right: 5px; vertical-align: 1px; background: transparent;
+}
+.fc-day-grid-event.assignment .mycal-priority-dot[hidden] { display: none !important; }
+.fc-day-grid-event.assignment .mycal-priority-dot[data-priority="low"] { background: #2f9c63; }
+.fc-day-grid-event.assignment .mycal-priority-dot[data-priority="medium"] { background: #e6a52d; }
+.fc-day-grid-event.assignment .mycal-priority-dot[data-priority="high"] { background: #df514d; }
+.fc-day-grid-event.assignment .power-tool-badge { background: transparent; color: inherit; opacity: .95; padding-left: 0; }
